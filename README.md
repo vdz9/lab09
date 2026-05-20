@@ -1,9 +1,10 @@
 [![CI](https://github.com/vdz9/lab06/actions/workflows/ci.yml/badge.svg)](https://github.com/vdz9/lab06/actions/workflows/ci.yml)
 ### Tasks: Изучение систем автоматизации развёртывания и управления приложениями на примере Docker
 
-1. Создать публичный репозиторий с названием **lab08** на сервисе **GitHub**
+1. Создать публичный репозиторий с названием **lab09** на сервисе **GitHub**
 2. Ознакомиться со ссылками учебного материала
-3. Выполнить инструкцию учебного материала
+3. Получить токен для доступа к репозиториям сервиса GitHub
+4. Выполнить инструкцию учебного материала
 
 ### 1. Настройка переменных окружения
 
@@ -16,150 +17,78 @@ cd ${GITHUB_USERNAME}/workspace
 pushd .
 source scripts/activate
 
-git clone https://github.com/${GITHUB_USERNAME}/lab07.git projects/lab08
-cd projects/lab08
+git clone https://github.com/${GITHUB_USERNAME}/lab08.git projects/lab08
+cd projects/lab09
 git remote remove origin
-git remote add origin https://github.com/${GITHUB_USERNAME}/lab08.git
+git remote add origin https://github.com/${GITHUB_USERNAME}/lab09.git
 ```
 
 Результат: Копирование репозитория из предыдущей лабораторной работы в текущую и последующая его привязка к новому репозиторию
-### 2. Создание Dockerfile
+### 2. Установка GPG и создание ключа
 
 ```bash
-cat > Dockerfile <<'EOF'
-FROM ubuntu:20.04
-EOF
-```
-```bash
-cat >> Dockerfile <<'EOF'
-RUN apt update && apt install -y gcc g++ cmake
-EOF
-```
-```bash
-cat >> Dockerfile <<'EOF'
-COPY . print/
-WORKDIR print
-EOF
-```
-```bash
-cat >> Dockerfile <<'EOF'
-RUN cmake -H. -B_build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=_install
-RUN cmake --build _build
-RUN cmake --build _build --target install
-EOF
-```
-```bash
-cat >> Dockerfile <<'EOF'
-ENV LOG_PATH /home/logs/log.txt
-EOF
-```
-```bash
-cat >> Dockerfile <<'EOF'
-VOLUME /home/logs
-EOF
-```
-```bash
-cat >> Dockerfile <<'EOF'
-WORKDIR _install/bin
-EOF
-```
-```bash
-cat >> Dockerfile <<'EOF'
-ENTRYPOINT ["./demo"]
-EOF
+sudo apt install -y gpg
+gpg --full-generate-key
 ```
 
-Результат: Создание Dockerfile с инструкциями для сборки образа на основе Ubuntu 20.04, установки компиляторов, копирования исходного кода, сборки проекта и настройки точки входа на демо-приложение
+Результат: Создание GPG-ключ для подписи тегов
 
-### 3. Сборка Docker-образа
-
-```bash
-sudo docker build -t logger .
-```
-Результат: Успешная сборка Docker-образа с именем logger
-
-### 4. Проверка списка образов
+### 3. Получение ID ключа и настройка Git
 
 ```bash
-sudo docker images
+gpg --list-secret-keys --keyid-format LONG
+GPG_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep ssb | tail -1 | awk '{print $2}' | awk -F'/' '{print $2}')
+GPG_SEC_KEY_ID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | tail -1 | awk '{print $2}' | awk -F'/' '{print $2}')
+git config user.signingkey ${GPG_SEC_KEY_ID}
+git config gpg.program gpg
 ```
-Результат: 
-```
-IMAGE           ID             DISK USAGE   CONTENT SIZE   EXTRA
-logger:latest   9a51c735b0de        652MB          182MB        
-ubuntu:20.04    8feb4d8ca535        111MB         29.3MB
-```
+Результат: Git настроен для подписи тегов GPG-ключом
 
-### 5. Запуск контейнера с томом для логов
-
-```bash
-mkdir -p logs
-sudo docker run -it -v "$(pwd)/logs/:/home/logs/" logger
-```
-
-Результат: Запуск контейнера в интерактивном режиме, введенный текст сохранен в файл /home/logs/log.txt внутри контейнера, который смонтирован на локальную директорию logs  
-Ввод текста:
-```
-text1
-text2
-text3
-```
-### 6. Проверка информации об образе
-```bash
-sudo docker inspect logger
-```
-Результат:
-```bash
-[
-    {
-        "Architecture": "amd64",
-        "Config": {
-            "Labels": {
-                "org.opencontainers.image.ref.name": "ubuntu",
-                "org.opencontainers.image.version": "20.04"
-        },
-        "Created": "2026-05-14T22:46:23.009217196+03:00",
-        "Descriptor": {
-            "digest": "sha256:9a51c735b0dee24f0d55633c45caf5adda94a0922c524dd9b20d10f8897f3674",
-            "mediaType": "application/vnd.oci.image.manifest.v1+json",
-            "size": 1624
-        },
-        "Id": "sha256:9a51c735b0dee24f0d55633c45caf5adda94a0922c524dd9b20d10f8897f3674",
-        "Metadata": {
-            "LastTagTime": "2026-05-14T19:46:23.090314389Z"
-        },
-        "Os": "linux",
-        "Parent": "sha256:2f6564a42107007e524407904ba950d5e92463e802b6a7468b972898ebf307db",
-        "RepoDigests": [
-            "logger@sha256:9a51c735b0dee24f0d55633c45caf5adda94a0922c524dd9b20d10f8897f3674"
-        ],
-        "RepoTags": [
-            "logger:latest"
-        ],
-        "RootFS": {
-            "Layers": [
-                "sha256:470b66ea5123c93b0d5606e4213bf9e47d3d426b640d32472e4ac213186c4bb6",
-                "sha256:16b8634b3731e839ddfc56e54218071256344f0d6d0ad97f43c84812995e6f34",
-                "sha256:026c51be27ef5bd06cff92fc321066965f6ed40f33c8d2247e030454760910f0",
-                "sha256:08b18aeb56a2f19f3c248f86af46680ed9c057f7f33436b42442a60f8b8eda57",
-                "sha256:3125a2c7778d1e6d94180474c3670844a86d8dbe2994964ee24f21e01c74cde6",
-                "sha256:24edf523f5171f0d3544ae19dce718346a79528fea785db85e0bc7a6b9ae4c1c"
-            ],
-            "Type": "layers"
-        },
-        "Size": 182479038
-    }
-]
-#docker inspect немного отредактирован чтобы не раскрыть внутреннюю структуру проекта, хэш образы, ключи API и т.д.
-```
-### 7. Проверка сохраненных логов
+### 4. Экспорт публичного ключа
 
 ```bash
-cat logs/log.txt
+gpg --armor --export ${GPG_KEY_ID} > gpg_public.key
+cat gpg_public.key
 ```
-Результат: 
+Результат: Публичный GPG-ключ добавлен на GitHub
+
+### 5. Настройка GPG_TTY
+
+```bash
+test -r ~/.bash_profile && echo 'export GPG_TTY=$(tty)' >> ~/.bash_profile
+echo 'export GPG_TTY=$(tty)' >> ~/.profile
 ```
-text1
-text2
-text3
+
+Результат: Добавление GPG_TTY в профили для корректной работы GPG в терминале
+### 6. Авторизация в GitHub CLI
+
+```bash
+gh auth login
+
+#Авторизация была проведина непосредственно через сайт
+#Выбрано -> GitHub.com ->  HTTPS -> Login with a web browser
 ```
+
+Результат: Авторизация GitHub CLI для работы с репозиторием
+### 7. Создание подписанного тега
+
+```bash
+rm -f .git/TAG_EDITMSG
+git tag -s v0.1.0.0 -m "first release"
+git tag -v v0.1.0.0
+git show v0.1.0.0
+git push origin master --tags
+```
+
+Результат: Создание подписанного GPG-тега v0.1.0.0
+
+### 8. Загрузка артефакта в релиз
+
+```bash
+export PACKAGE_OS=`uname -s` PACKAGE_ARCH=`uname -m`
+export PACKAGE_FILENAME=print-${PACKAGE_OS}-${PACKAGE_ARCH}.tar.gz
+gh release upload v0.1.0.0 _build/*.tar.gz --clobber
+```
+
+Результат: Артефакт print-Linux-x86_64.tar.gz загружен в релиз v0.1.0.0
+
